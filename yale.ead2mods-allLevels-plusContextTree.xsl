@@ -10,7 +10,8 @@
         <xd:desc>
             <xd:p><xd:b>Created on:</xd:b> Jul 14, 2014</xd:p>
             <xd:p><xd:b>Author:</xd:b> Mark Custer</xd:p>
-            <xd:p>The yale.ead.clean.step1.xsl style sheet should be run on the AT's EAD output before this style sheet is used.</xd:p>
+            <xd:p>The yale.aspace_v112_to_yalebpgs-not_for_YFAD.xsl style sheet should be run on the
+                ASpace EAD output before this style sheet is used.</xd:p>
             <xd:ul>
                 <xd:li>
                     <xd:b>Organized into four sections:</xd:b>
@@ -27,10 +28,6 @@
 
     <!-- to do:
         
-        REMOVE whitespace / linebreaks in MODS output.  Example.  ref19650:
-            <unittitle>Interview on 
-                    <title render="italic">Today</title>, NBC, Apr 25, 1977</unittitle>  /// Done
-        
         to make DACS single-level minimum record compliant....   
                     compute the physdesc
                     make sure to inherit title / data information from the first ancestor that has one of those, if missing at that level of description
@@ -41,25 +38,9 @@
                     add another EAD-snippet that separates the inherited data, to be somewhat explicit about how the MODS record is created?
                     
                     use the UI/delivery platrom to show the scope and content notes for ancestors in the breadcrumb (see NYPL for an example of this; hover over the "i" icons).
-        
-        fix up EAD:HEAD...  use values from BPG list, if default AT values are present. /// Done
-        
+              
         Add parameters to control what gets serialized to MODS:  example, pass an ID, and another flag whether to get only that level or that level plus all of the children
         allow multiple IDs to be passed in an array.
-        
-        fix up unitdates entries (parse out start and end dates)
-        
-        if the prefercite is missing, add one, using the title and date from current component, plus container info...  Mike F. and crew will add in the URL.  (done)
-        
-        fix up physdesc translations
-        
-        replace generic AT <head> elements with Yale Best Practice ones
-        
-        finish up EAD mappings for controlaccess and repository info. (done, but needs review)
-        
-        add in XACML data for at least one level of description in EAD based on flags/notes included there?
-        
-        make sure "internal only"  notes are flagged in some way in the MODS.
         
         where to put dao's ???
        
@@ -67,6 +48,21 @@
         -->
 
     <xsl:output encoding="UTF-8" indent="yes" method="xml"/>
+
+    <!-- the user must specify what elements are to be stripped when calling the style sheet-->
+    <xsl:param name="element-to-strip"/>
+    <xsl:template match="*[local-name = $element-to-strip]" priority="10"/>
+
+    <!-- this is done for a local requirement; otherwise I'd set it to false, since it results in bloated MODS files-->
+    <xsl:param name="paramertize-dates-option" select="true()" as="xs:boolean"/>
+
+    <!-- adding this, since I can't always rely on xsl:copy in this finding aid anymore-->
+    <xsl:template match="@* | node()" mode="ead-snippet-copy">
+        <xsl:copy>
+            <xsl:apply-templates select="@* | node()" mode="#current"/>
+        </xsl:copy>
+    </xsl:template>
+
 
     <!-- SECTION 1 -->
     <!-- SECTION 1 -->
@@ -168,8 +164,11 @@
                         </xsl:otherwise>
                     </xsl:choose>
                 </xsl:if>
+                <xsl:if test="not(ead:originalsloc)">
+                    <xsl:apply-templates select="ancestor::*[ead:originalsloc][1]/ead:originalsloc"
+                    />
+                </xsl:if>
                 <xsl:if test="not(ead:prefercite)">
-                    <!-- put addtional stuff here.  What's the best way to format this for MODS?  See Princeton examples.  Any others?-->
                     <mods:note type="preferredCitation">
                         <xsl:call-template name="combine-that-title-and-date-NO-HTML">
                             <xsl:with-param name="from-treeData-mode" select="false()"
@@ -193,55 +192,88 @@
                 </xsl:if>
                 <mods:extension displayLabel="EAD-snippet">
                     <xsl:copy>
+                        <xsl:apply-templates select="@*" mode="ead-snippet-copy"/>
                         <xsl:if test="not(@audience)">
-                                    <xsl:copy select="ancestor::*[@audience]/@audience"/>
+                            <xsl:copy select="ancestor::*[@audience]/@audience"/>
                         </xsl:if>
-                        <xsl:copy-of
-                            select="@* | * except *[local-name() = ('c',  'c01', 'c02', 'c03', 'c04', 'c05', 'c06', 'c07', 'c08', 'c09', 'c10', 'c11', 'c12')]"/>
-                        <!-- put in another mods:extension section???-->
+                        <!-- had to remove "copy of" since we need to inherit physloc notes, as well-->
+                        <xsl:apply-templates
+                            select="
+                                * except *[local-name() = ('c',
+                                'c01',
+                                'c02',
+                                'c03',
+                                'c04',
+                                'c05',
+                                'c06',
+                                'c07',
+                                'c08',
+                                'c09',
+                                'c10',
+                                'c11',
+                                'c12')]"
+                            mode="ead-snippet-copy"/>
                         <xsl:if test="not(ead:accessrestrict)">
                             <xsl:choose>
                                 <xsl:when test="ancestor::*[ead:accessrestrict][1]">
-                                    <xsl:copy
+                                    <xsl:for-each
                                         select="ancestor::*[ead:accessrestrict][1]/ead:accessrestrict">
-                                        <xsl:attribute name="altrender">
-                                            <xsl:text>inherited</xsl:text>
-                                        </xsl:attribute>
-                                        <xsl:copy-of select="@*|node()"/>
-                                    </xsl:copy>
+                                        <xsl:copy>
+                                            <xsl:attribute name="altrender">
+                                                <xsl:text>inherited</xsl:text>
+                                            </xsl:attribute>
+                                            <xsl:copy-of select="@* except @altrender | node()"/>
+                                        </xsl:copy>
+                                    </xsl:for-each>
                                 </xsl:when>
                                 <xsl:otherwise>
-                                    <xsl:copy
+                                    <xsl:for-each
                                         select="ancestor::ead:archdesc/ead:descgrp/ead:accessrestrict">
-                                        <xsl:attribute name="altrender">
-                                            <xsl:text>inherited</xsl:text>
-                                        </xsl:attribute>
-                                        <xsl:copy-of select="@*|node()"/>
-                                    </xsl:copy>
+                                        <xsl:copy>
+                                            <xsl:attribute name="altrender">
+                                                <xsl:text>inherited</xsl:text>
+                                            </xsl:attribute>
+                                            <xsl:copy-of select="@* except @altrender | node()"/>
+                                        </xsl:copy>
+                                    </xsl:for-each>
                                 </xsl:otherwise>
                             </xsl:choose>
                         </xsl:if>
                         <xsl:if test="not(ead:userestrict)">
                             <xsl:choose>
                                 <xsl:when test="ancestor::*[ead:userestrict][1]">
-                                    <xsl:copy
+                                    <xsl:for-each
                                         select="ancestor::*[ead:userestrict][1]/ead:userestrict">
-                                        <xsl:attribute name="altrender">
-                                            <xsl:text>inherited</xsl:text>
-                                        </xsl:attribute>
-                                        <xsl:copy-of select="@*|node()"/>
-                                    </xsl:copy>
+                                        <xsl:copy>
+                                            <xsl:attribute name="altrender">
+                                                <xsl:text>inherited</xsl:text>
+                                            </xsl:attribute>
+                                            <xsl:copy-of select="@* except @altrender | node()"/>
+                                        </xsl:copy>
+                                    </xsl:for-each>
                                 </xsl:when>
                                 <xsl:otherwise>
-                                    <xsl:copy
+                                    <xsl:for-each
                                         select="ancestor::ead:archdesc/ead:descgrp/ead:userestrict">
-                                        <xsl:attribute name="altrender">
-                                            <xsl:text>inherited</xsl:text>
-                                        </xsl:attribute>
-                                        <xsl:copy-of select="@*|node()"/>
-                                    </xsl:copy>
+                                        <xsl:copy>
+                                            <xsl:attribute name="altrender">
+                                                <xsl:text>inherited</xsl:text>
+                                            </xsl:attribute>
+                                            <xsl:copy-of select="@* except @altrender | node()"/>
+                                        </xsl:copy>
+                                    </xsl:for-each>
                                 </xsl:otherwise>
                             </xsl:choose>
+                        </xsl:if>
+                        <xsl:if test="not(ead:originalsloc)">
+                            <xsl:for-each select="ancestor::*[ead:originalsloc][1]/ead:originalsloc">
+                                <xsl:copy>
+                                    <xsl:attribute name="altrender">
+                                        <xsl:text>inherited</xsl:text>
+                                    </xsl:attribute>
+                                    <xsl:copy-of select="@* except @altrender | node()"/>
+                                </xsl:copy>
+                            </xsl:for-each>
                         </xsl:if>
                         <xsl:if test="not(ead:prefercite)">
                             <xsl:element name="prefercite" namespace="urn:isbn:1-931666-22-9">
@@ -249,23 +281,23 @@
                                     <xsl:text>constructed</xsl:text>
                                 </xsl:attribute>
                                 <xsl:element name="p" namespace="urn:isbn:1-931666-22-9">
-                                <xsl:call-template name="combine-that-title-and-date-NO-HTML">
-                                    <xsl:with-param name="from-treeData-mode" select="false()"
-                                        as="xs:boolean"/>
-                                </xsl:call-template>
-                                <xsl:text>. </xsl:text>
-                                <xsl:choose>
-                                    <xsl:when test="ancestor::*[ead:prefercite][1]">
-                                        <xsl:apply-templates
-                                            select="ancestor::*[ead:userestrict][1]/ead:prefercite"
-                                            mode="noMODS-noEADHEAD"/>
-                                    </xsl:when>
-                                    <xsl:otherwise>
-                                        <xsl:apply-templates
-                                            select="ancestor::ead:archdesc/ead:descgrp/ead:prefercite"
-                                            mode="noMODS-noEADHEAD"/>
-                                    </xsl:otherwise>
-                                </xsl:choose>
+                                    <xsl:call-template name="combine-that-title-and-date-NO-HTML">
+                                        <xsl:with-param name="from-treeData-mode" select="false()"
+                                            as="xs:boolean"/>
+                                    </xsl:call-template>
+                                    <xsl:text>. </xsl:text>
+                                    <xsl:choose>
+                                        <xsl:when test="ancestor::*[ead:prefercite][1]">
+                                            <xsl:apply-templates
+                                                select="ancestor::*[ead:userestrict][1]/ead:prefercite"
+                                                mode="noMODS-noEADHEAD"/>
+                                        </xsl:when>
+                                        <xsl:otherwise>
+                                            <xsl:apply-templates
+                                                select="ancestor::ead:archdesc/ead:descgrp/ead:prefercite"
+                                                mode="noMODS-noEADHEAD"/>
+                                        </xsl:otherwise>
+                                    </xsl:choose>
                                 </xsl:element>
                             </xsl:element>
                         </xsl:if>
@@ -282,12 +314,29 @@
                     <!-- add parent info here, or elsewhere? -->
                     <mods:identifier type="parentID">
                         <xsl:value-of
-                            select="if (../@id) then concat($collection-ID, '/', ../@id) else $collection-ID"
+                            select="
+                                if (../@id) then
+                                    concat($collection-ID, '/', ../@id)
+                                else
+                                    $collection-ID"
                         />
                     </mods:identifier>
                     <mods:identifier type="z-index">
                         <xsl:value-of
-                            select="count(preceding-sibling::*[local-name() = ('c',  'c01', 'c02', 'c03', 'c04', 'c05', 'c06', 'c07', 'c08', 'c09', 'c10', 'c11', 'c12')]) +1"
+                            select="
+                                count(preceding-sibling::*[local-name() = ('c',
+                                'c01',
+                                'c02',
+                                'c03',
+                                'c04',
+                                'c05',
+                                'c06',
+                                'c07',
+                                'c08',
+                                'c09',
+                                'c10',
+                                'c11',
+                                'c12')]) + 1"
                         />
                     </mods:identifier>
 
@@ -308,9 +357,12 @@
                     <mods:location>
                         <mods:physicalLocation displayLabel="Yale Collection">
                             <xsl:apply-templates
-                                select="if (ead:did/ead:repository) 
-                                then ead:did/ead:repository/ead:corpname
-                                else /ead:ead/ead:archdesc[1]/ead:did[1]/ead:repository[1]/ead:corpname[1]/normalize-space()"
+                                select="
+                                    if (ead:did/ead:repository)
+                                    then
+                                        ead:did/ead:repository/ead:corpname
+                                    else
+                                        /ead:ead/ead:archdesc[1]/ead:did[1]/ead:repository[1]/ead:corpname[1]/normalize-space()"
                             />
                         </mods:physicalLocation>
                     </mods:location>
@@ -326,89 +378,10 @@
     <!-- SECTION 3 -->
 
     <xsl:template match="ead:head">
-        <!-- still need to fix this up to match Yale EAD BPG, or change the values in the yale.ead.clean.step1 process -->
-        <xsl:choose>
-            <!--pass a different parameter here to determine
-                            when the scope and content header should display or not.
-                            or, just always have it display!
-                            -->
-            <xsl:when test="text()='Scope and Contents note'"/>
-
-            <xsl:when test="text()='Accruals note'">
-                <xsl:value-of select="'Accruals: '"/>
-            </xsl:when>
-            <xsl:when test="text()='Appraisal note'">
-                <xsl:value-of select="'Appraisal Note: '"/>
-            </xsl:when>
-            <xsl:when test="text()='Arrangement note'">
-                <xsl:value-of select="'Arrangement: '"/>
-            </xsl:when>
-            <!--need to tweak these next two options still-->
-            <xsl:when test="text()='Biographical/Historical note' and /ead:ead/ead:archdesc/ead:did/ead:origination/ead:persname">
-                <xsl:value-of select="'Biographical Overview: '"/>
-            </xsl:when>
-            <xsl:when test="text()='Biographical/Historical note'  and /ead:ead/ead:archdesc/ead:did/ead:origination/ead:corpname">
-                <xsl:value-of select="'Historical Overview: '"/>
-            </xsl:when>
-            <xsl:when test="text()='Biographical/Historical note'">
-                <xsl:value-of select="'Biographical/Historical Overview: '"/>
-            </xsl:when>
-            <xsl:when test="text()='Conditions Governing Access note'">
-                <xsl:value-of select="'Information about Access: '"/>
-            </xsl:when>
-            <xsl:when test="text()='Conditions Governing Use note'">
-                <xsl:value-of select="'Ownership &amp; Copyright: '"/>
-            </xsl:when>
-            <xsl:when test="text()='Custodial History note'">
-                <xsl:value-of select="'Custodial History: '"/>
-            </xsl:when>
-            <xsl:when test="text()='Existence and Location of Copies note'">
-                <xsl:value-of select="'Alternative Formats: '"/>
-            </xsl:when>
-            <xsl:when test="text()='Existence and Location of Originals note'">
-                <xsl:value-of select="'Location of Originals: '"/>
-            </xsl:when>
-            <xsl:when test="text()='General note'">
-                <xsl:value-of select="'General Note: '"/>
-            </xsl:when>
-            <xsl:when test="text()='Immediate Source of Acquisition note'">
-                <xsl:value-of select="'Acquisition Information: '"/>
-            </xsl:when>
-            <xsl:when test="text()='Legal Status note'">
-                <xsl:value-of select="'Legal Status: '"/>
-            </xsl:when>
-            <xsl:when test="text()='Location note'">
-                <xsl:value-of select="'Physical Location: '"/>
-            </xsl:when>
-            <xsl:when test="text()='Material Specific Details note'">
-                <xsl:value-of select="'Material Specification: '"/>
-            </xsl:when>
-            <xsl:when test="text()='Other Finding Aids note'">
-                <xsl:value-of select="'Other Finding Aids: '"/>
-            </xsl:when>
-            <xsl:when
-                test="text()='Physical Characteristics and Technical Requirements note'">
-                <xsl:value-of select="'Physical Characteristics / Technical Requirements: '"/>
-            </xsl:when>
-            <xsl:when test="text()='Physical Facet note'">
-                <xsl:value-of select="'Physical Appearance of Materials: '"/>
-            </xsl:when>
-            <xsl:when test="text()='Processing Information note'">
-                <xsl:value-of select="'Processing Notes: '"/>
-            </xsl:when>
-            <xsl:when test="text()='Related Archival Materials note'">
-                <xsl:value-of select="'Associated Materials: '"/>
-            </xsl:when>
-            <xsl:when test="text()='Separated Materials note'">
-                <xsl:value-of select="'Transferred Materials: '"/>
-            </xsl:when>
-            <xsl:otherwise>
-                <xsl:apply-templates/>
-                <xsl:text>: </xsl:text>
-            </xsl:otherwise>
-        </xsl:choose>
+        <xsl:apply-templates/>
+        <xsl:text>: </xsl:text>
     </xsl:template>
-    
+
     <xsl:template match="ead:*" mode="noMODS-noEADHEAD">
         <xsl:apply-templates select="* except ead:head"/>
     </xsl:template>
@@ -419,10 +392,30 @@
     <xsl:template match="ead:descgrp//ead:head"/>
     <xsl:template match="ead:controlaccess//ead:p"/>
     <xsl:template match="ead:did/ead:repository"/>
- 
+
+    <xsl:template match="ead:dao | ead:daogrp"/>
+
+    <xsl:template match="ead:did" mode="ead-snippet-copy">
+        <xsl:copy>
+            <xsl:copy-of select="@* | *"/>
+            <!-- added for materials held elsewhere, so we need to inherit the physloc information-->
+            <xsl:if test="not(ead:physloc)">
+                <xsl:copy select="ancestor::*[ead:did/ead:physloc][1]/ead:did/ead:physloc">
+                    <xsl:attribute name="altrender">
+                        <xsl:text>inherited</xsl:text>
+                    </xsl:attribute>
+                    <xsl:copy-of select="@* except @altrender | node()"/>
+                </xsl:copy>
+            </xsl:if>
+        </xsl:copy>
+    </xsl:template>
 
     <xsl:template match="ead:did">
-        <xsl:apply-templates select="* except (ead:container, ead:unitdate, ead:unittitle)"/>
+        <xsl:apply-templates
+            select="
+                * except (ead:container,
+                ead:unitdate,
+                ead:unittitle)"/>
         <xsl:choose>
             <xsl:when test="ead:unittitle/normalize-space() = '' or not(ead:unittitle)">
                 <xsl:apply-templates
@@ -434,6 +427,7 @@
             </xsl:otherwise>
         </xsl:choose>
 
+
         <xsl:call-template name="construct-title-for-HTML"/>
 
         <!-- test to make sure this produces results as expected.-->
@@ -442,7 +436,7 @@
                 select="../ancestor::*[ead:did/ead:unitdate/not(normalize-space() = '')][1]/ead:did/ead:unitdate"
             />
         </xsl:if>
-        <xsl:apply-templates select="ead:unitdate[not(contains(., 'undated'))][not(@type='bulk')]">
+        <xsl:apply-templates select="ead:unitdate[not(contains(., 'undated'))][not(@type = 'bulk')]">
             <xsl:sort select="substring-before(@normal, '/')" data-type="number"/>
             <xsl:sort select="substring-after(@normal, '/')" data-type="number"/>
             <xsl:sort select="." data-type="text" order="ascending"/>
@@ -457,6 +451,17 @@
             <xsl:sort select="substring-after(@normal, '/')" data-type="number"/>
             <xsl:sort select="." data-type="text" order="ascending"/>
         </xsl:apply-templates>
+
+        <!-- added for materials held elsewhere, so we need to inherit the information-->
+        <xsl:if test="not(ead:physloc)">
+            <xsl:choose>
+                <xsl:when test="ancestor::*[ead:did/ead:physloc][1]">
+                    <xsl:apply-templates
+                        select="ancestor::*[ead:did/ead:physloc][1]/ead:did/ead:physloc"/>
+                </xsl:when>
+                <xsl:otherwise/>
+            </xsl:choose>
+        </xsl:if>
     </xsl:template>
 
     <xsl:template match="ead:container">
@@ -497,36 +502,45 @@
         </mods:titleInfo>
     </xsl:template>
 
-    <!--change this so that there's not more than one originInfo if there are multiple unitdate elements????
-        also, how best to handle bulk dates?-->
-
     <!-- if contains ca. (or circa) add:
-         qualifier="approximate" 
+         qualifier="approximate" ?
          -->
     <xsl:template match="ead:unitdate">
         <mods:originInfo>
+            <xsl:attribute name="displayLabel">
+                <xsl:value-of
+                    select="
+                        if (@type = 'bulk') then
+                            'Bulk Dates'
+                        else
+                            'Dates'"
+                />
+            </xsl:attribute>
             <xsl:apply-templates select="@normal"/>
             <mods:dateCreated>
                 <xsl:apply-templates/>
             </mods:dateCreated>
         </mods:originInfo>
-        <!-- example of what we need 
-        
-   <mods:originInfo>
-      <mods:dateOther point="start" encoding="iso8601" keyDate="yes">2001-00-00T00:00:00Z</mods:dateOther>
-      <mods:dateOther point="end" encoding="iso8601">2013-00-00T00:00:00Z</mods:dateOther>
-      <mods:dateCreated>2001-2013</mods:dateCreated>
-   </mods:originInfo>
-        
-        -->
     </xsl:template>
     
     <xsl:template match="ead:unitdate/@normal">
         <xsl:variable name="startDate">
-            <xsl:value-of select="if (contains(., '/')) then substring-before(., '/') else ."/>
+            <xsl:value-of
+                select="
+                    if (contains(., '/')) then
+                        substring-before(., '/')
+                    else
+                        ."
+            />
         </xsl:variable>
         <xsl:variable name="endDate">
-            <xsl:value-of select="if (contains(., '/')) then substring-after(., '/') else ."/>
+            <xsl:value-of
+                select="
+                    if (contains(., '/')) then
+                        substring-after(., '/')
+                    else
+                        ."
+            />
         </xsl:variable>
         <!--these next variables assume and trust that the data is encoded like so:
             1900-10-02, which is what ASpace does.
@@ -537,10 +551,22 @@
             <xsl:value-of select="substring($startDate, 1, 4)"/>
         </xsl:variable>
         <xsl:variable name="startMonth">
-            <xsl:value-of select="if (string-length($startDate) gt 4) then substring($startDate, 6, 7) else '00'"/>
+            <xsl:value-of
+                select="
+                    if (string-length($startDate) gt 4) then
+                        substring($startDate, 6, 2)
+                    else
+                        '00'"
+            />
         </xsl:variable>
         <xsl:variable name="startDay">
-            <xsl:value-of select="if (string-length($startDate) gt 8) then substring($startDate, 9, 10) else '00'"/>
+            <xsl:value-of
+                select="
+                    if (string-length($startDate) gt 8) then
+                        substring($startDate, 9, 2)
+                    else
+                        '00'"
+            />
         </xsl:variable>
         <xsl:variable name="startTime">
             <xsl:value-of>
@@ -548,15 +574,27 @@
                 <xsl:text>T00:00:00Z</xsl:text>
             </xsl:value-of>
         </xsl:variable>
-        
+
         <xsl:variable name="endYear">
             <xsl:value-of select="substring($endDate, 1, 4)"/>
         </xsl:variable>
         <xsl:variable name="endMonth">
-            <xsl:value-of select="if (string-length($endDate) gt 4) then substring($startDate, 6, 7) else '00'"/>
+            <xsl:value-of
+                select="
+                    if (string-length($endDate) gt 4) then
+                        substring($endDate, 6, 2)
+                    else
+                        '00'"
+            />
         </xsl:variable>
         <xsl:variable name="endDay">
-            <xsl:value-of select="if (string-length($endDate) gt 8) then substring($startDate, 9, 10) else '00'"/>
+            <xsl:value-of
+                select="
+                    if (string-length($endDate) gt 8) then
+                        substring($endDate, 9, 2)
+                    else
+                        '00'"
+            />
         </xsl:variable>
         <xsl:variable name="endTime">
             <xsl:value-of>
@@ -564,24 +602,63 @@
                 <xsl:text>T00:00:00Z</xsl:text>
             </xsl:value-of>
         </xsl:variable>
-        
+
         <mods:dateOther>
             <xsl:attribute name="point">start</xsl:attribute>
             <xsl:attribute name="encoding">iso8601</xsl:attribute>
             <xsl:if
-                test="not(../@type eq 'bulk') and not(../preceding-sibling::ead:unitdate[@type = ('single', 'inclusive')])">
+                test="
+                    not(../@type eq 'bulk') and not(../preceding-sibling::ead:unitdate[@type = ('single',
+                    'inclusive')])">
                 <xsl:attribute name="keyDate">yes</xsl:attribute>
             </xsl:if>
-            <xsl:value-of select="$startYear || '-' || $startMonth || '-' || $startDay ||  $startTime"/>
+            <xsl:value-of
+                select="$startYear || '-' || $startMonth || '-' || $startDay || $startTime"/>
         </mods:dateOther>
-        
+
+        <!-- we won't tokenize bulk date ranges since those should always be repeated values.
+            it would be nice, though, if we could weight the index in favor of bulk dates, I think...
+            but right now, the only objective with this is to add a series of tokenized dates to support a 
+            date slider -->
+
+
+        <xsl:if test="../@type = 'inclusive' and $paramertize-dates-option = true()">
+            <xsl:call-template name="tokenize-dates">
+                <xsl:with-param name="startYear" select="$startYear"/>
+                <xsl:with-param name="endYear" select="$endYear"/>
+            </xsl:call-template>
+        </xsl:if>
+
+        <!-- should we exclude this if the date end = date begin ?? -->
+        <!-- should we exclude this if the date end = date begin ?? -->
+        <!-- should we exclude this if the date end = date begin ?? -->
+
+        <!-- should we exclude this if the date end = date begin ?? -->
+        <!-- should we exclude this if the date end = date begin ?? -->
+        <!-- should we exclude this if the date end = date begin ?? -->
         <mods:dateOther>
             <xsl:attribute name="point">end</xsl:attribute>
             <xsl:attribute name="encoding">iso8601</xsl:attribute>
-            <xsl:value-of select="$endYear || '-' || $endMonth || '-' || $endDay ||  $endTime"/>
+            <xsl:value-of select="$endYear || '-' || $endMonth || '-' || $endDay || $endTime"/>
         </mods:dateOther>
-        
+
     </xsl:template>
+
+
+    <xsl:template name="tokenize-dates">
+        <xsl:param name="startYear"/>
+        <xsl:param name="endYear"/>
+        <!-- what could go wrong here? :) -->
+        <xsl:for-each select="(xs:integer($startYear) + 1) to (xs:integer($endYear) - 1)">
+            <mods:dateOther>
+                <xsl:attribute name="type">tokenized</xsl:attribute>
+                <xsl:attribute name="encoding">iso8601</xsl:attribute>
+                <xsl:value-of select=". || '-' || '00' || '-' || '00' || 'T00:00:00Z'"/>
+            </mods:dateOther>
+        </xsl:for-each>
+    </xsl:template>
+
+
 
     <xsl:template match="ead:unitid">
         <mods:identifier type="ead-unitid">
@@ -612,6 +689,19 @@
             <xsl:apply-templates/>
         </mods:extent>
     </xsl:template>
+
+    <xsl:template match="ead:physfacet">
+        <mods:note type="physfacet">
+            <xsl:apply-templates/>
+        </mods:note>
+    </xsl:template>
+
+    <xsl:template match="ead:dimensions">
+        <mods:note type="dimensions">
+            <xsl:apply-templates/>
+        </mods:note>
+    </xsl:template>
+
 
     <xsl:template match="ead:origination">
         <mods:name>
@@ -716,7 +806,11 @@
     <xsl:template match="ead:accessrestrict | ead:userestrict">
         <mods:accessCondition>
             <xsl:attribute name="type"
-                select="if (self::ead:accessrestrict) then 'restrictionOnAccess' else 'useAndReproduction'"/>
+                select="
+                    if (self::ead:accessrestrict) then
+                        'restrictionOnAccess'
+                    else
+                        'useAndReproduction'"/>
             <xsl:apply-templates/>
         </mods:accessCondition>
     </xsl:template>
@@ -770,8 +864,12 @@
         </mods:note>
     </xsl:template>
 
-    <!-- dropped.   not in use in our AT databases -->
-    <xsl:template match="ead:fileplan"/>
+    <!-- not in use in our AT/ASpace databases; added here for completeness -->
+    <xsl:template match="ead:fileplan">
+        <mods:note type="fileplan">
+            <xsl:apply-templates/>
+        </mods:note>
+    </xsl:template>
 
     <xsl:template match="ead:index">
         <mods:note type="index">
@@ -830,12 +928,17 @@
     <!-- SECTION 4 -->
     <!-- SECTION 4 -->
     <xsl:template
-        match="ead:c | ead:c01 | ead:c02 | ead:c03 | ead:c04 |ead:c05 | ead:c06 | ead:c07 | ead:c08 | ead:c09 | ead:c10 | ead:c11 | ead:c12"
+        match="ead:c | ead:c01 | ead:c02 | ead:c03 | ead:c04 | ead:c05 | ead:c06 | ead:c07 | ead:c08 | ead:c09 | ead:c10 | ead:c11 | ead:c12"
         mode="treeData">
-        <xsl:variable name="data-dao-self" select="if (ead:dao) then true() else false()"/>
+        <xsl:variable name="data-dao-self"
+            select="
+                if (ead:dao) then
+                    true()
+                else
+                    false()"/>
         <xsl:choose>
             <xsl:when
-                test="ead:c | ead:c02 | ead:c03 | ead:c04 |ead:c05 | ead:c06 | ead:c07 | ead:c08 | ead:c09 | ead:c10 | ead:c11 | ead:c12">
+                test="ead:c | ead:c02 | ead:c03 | ead:c04 | ead:c05 | ead:c06 | ead:c07 | ead:c08 | ead:c09 | ead:c10 | ead:c11 | ead:c12">
                 <li>
                     <xsl:if test="@level">
                         <xsl:attribute name="class" select="@level"/>
@@ -847,7 +950,7 @@
                     <ul>
                         <!--if there is child other than the initial did, then we'll need to call this template recursively, like so-->
                         <xsl:apply-templates mode="#current"
-                            select="ead:c | ead:c02 | ead:c03 | ead:c04 |ead:c05 | ead:c06 | ead:c07 | ead:c08 | ead:c09 | ead:c10 | ead:c11 | ead:c12"
+                            select="ead:c | ead:c02 | ead:c03 | ead:c04 | ead:c05 | ead:c06 | ead:c07 | ead:c08 | ead:c09 | ead:c10 | ead:c11 | ead:c12"
                         />
                     </ul>
                 </li>
@@ -883,7 +986,7 @@
                 <xsl:value-of select="concat($collection-ID, '/', @id)"/>
             </xsl:attribute>
             <!-- i might need to update this to look out for trailinng punctuation arleady part of the unitid -->
-            <xsl:if test="ead:did/ead:unitid and  contains(@level, 'series')">
+            <xsl:if test="ead:did/ead:unitid and contains(@level, 'series')">
                 <xsl:apply-templates select="ead:did/ead:unitid" mode="#current"/>
                 <xsl:text>: </xsl:text>
             </xsl:if>
@@ -913,15 +1016,16 @@
                 </xsl:choose>
                 <!--prepare the date(s)-->
                 <xsl:apply-templates
-                    select="$xpath/ead:unitdate[not(contains(., 'undated'))][not(@type='bulk')]"
+                    select="$xpath/ead:unitdate[not(contains(., 'undated'))][not(@type = 'bulk')]"
                     mode="date-title-combine">
                     <xsl:sort select="substring-before(@normal, '/')" data-type="number"/>
                     <xsl:sort select="substring-after(@normal, '/')" data-type="number"/>
                     <xsl:sort select="." data-type="text" order="ascending"/>
                 </xsl:apply-templates>
                 <xsl:if
-                    test="$xpath/ead:unitdate[preceding-sibling::ead:unitdate][(contains(., 'undated'))] or
-                    $xpath/ead:unitdate[following-sibling::ead:unitdate][(contains(., 'undated'))]">
+                    test="
+                        $xpath/ead:unitdate[preceding-sibling::ead:unitdate][(contains(., 'undated'))] or
+                        $xpath/ead:unitdate[following-sibling::ead:unitdate][(contains(., 'undated'))]">
                     <xsl:text>, </xsl:text>
                 </xsl:if>
                 <xsl:apply-templates select="$xpath/ead:unitdate[(contains(., 'undated'))]"
@@ -945,8 +1049,9 @@
                         <xsl:when test="ends-with(normalize-space($xpath/ead:unittitle), '&quot;')">
                             <xsl:choose>
                                 <xsl:when
-                                    test="$from-treeData-mode eq true() and
-                                    not($xpath/ead:unitdate)">
+                                    test="
+                                        $from-treeData-mode eq true() and
+                                        not($xpath/ead:unitdate)">
                                     <xsl:apply-templates select="$xpath/ead:unittitle"
                                         mode="trailing-quote">
                                         <xsl:with-param name="keep-existing-comma" select="false()"
@@ -971,8 +1076,9 @@
                             </xsl:choose>
                         </xsl:when>
                         <xsl:when
-                            test="$xpath/ead:unittitle/*[last()][@render='doublequote' or @render='singlequote' or 
-                            @render='bolddoublequote' or @render='boldsinglequote']">
+                            test="
+                                $xpath/ead:unittitle/*[last()][@render = 'doublequote' or @render = 'singlequote' or
+                                @render = 'bolddoublequote' or @render = 'boldsinglequote']">
                             <xsl:choose>
                                 <xsl:when test="$xpath/ead:unitdate">
                                     <xsl:apply-templates select="$xpath/ead:unittitle">
@@ -999,15 +1105,16 @@
                 <!--the rest handles the unitdates...  if a title is missing, the unitdate
                     will thus just stand in for the unittitle-->
                 <xsl:apply-templates
-                    select="$xpath/ead:unitdate[not(contains(., 'undated'))][not(@type='bulk')]"
+                    select="$xpath/ead:unitdate[not(contains(., 'undated'))][not(@type = 'bulk')]"
                     mode="date-title-combine">
                     <xsl:sort select="substring-before(@normal, '/')" data-type="number"/>
                     <xsl:sort select="substring-after(@normal, '/')" data-type="number"/>
                     <xsl:sort select="." data-type="text" order="ascending"/>
                 </xsl:apply-templates>
                 <xsl:if
-                    test="$xpath/ead:unitdate[preceding-sibling::ead:unitdate][(contains(., 'undated'))] or
-                    $xpath/ead:unitdate[following-sibling::ead:unitdate][(contains(., 'undated'))]">
+                    test="
+                        $xpath/ead:unitdate[preceding-sibling::ead:unitdate][(contains(., 'undated'))] or
+                        $xpath/ead:unitdate[following-sibling::ead:unitdate][(contains(., 'undated'))]">
                     <xsl:text>, </xsl:text>
                 </xsl:if>
                 <xsl:apply-templates select="$xpath/ead:unitdate[(contains(., 'undated'))]"
@@ -1046,15 +1153,16 @@
                 </xsl:choose>
                 <!--prepare the date(s)-->
                 <xsl:apply-templates
-                    select="$xpath/ead:unitdate[not(contains(., 'undated'))][not(@type='bulk')]"
+                    select="$xpath/ead:unitdate[not(contains(., 'undated'))][not(@type = 'bulk')]"
                     mode="date-title-combine">
                     <xsl:sort select="substring-before(@normal, '/')" data-type="number"/>
                     <xsl:sort select="substring-after(@normal, '/')" data-type="number"/>
                     <xsl:sort select="." data-type="text" order="ascending"/>
                 </xsl:apply-templates>
                 <xsl:if
-                    test="$xpath/ead:unitdate[preceding-sibling::ead:unitdate][(contains(., 'undated'))] or
-                    $xpath/ead:unitdate[following-sibling::ead:unitdate][(contains(., 'undated'))]">
+                    test="
+                        $xpath/ead:unitdate[preceding-sibling::ead:unitdate][(contains(., 'undated'))] or
+                        $xpath/ead:unitdate[following-sibling::ead:unitdate][(contains(., 'undated'))]">
                     <xsl:text>, </xsl:text>
                 </xsl:if>
                 <xsl:apply-templates select="$xpath/ead:unitdate[(contains(., 'undated'))]"
@@ -1078,8 +1186,9 @@
                         <xsl:when test="ends-with(normalize-space($xpath/ead:unittitle), '&quot;')">
                             <xsl:choose>
                                 <xsl:when
-                                    test="$from-treeData-mode eq true() and
-                                    not($xpath/ead:unitdate)">
+                                    test="
+                                        $from-treeData-mode eq true() and
+                                        not($xpath/ead:unitdate)">
                                     <xsl:apply-templates select="$xpath/ead:unittitle"
                                         mode="trailing-quote">
                                         <xsl:with-param name="keep-existing-comma" select="false()"
@@ -1104,8 +1213,9 @@
                             </xsl:choose>
                         </xsl:when>
                         <xsl:when
-                            test="$xpath/ead:unittitle/*[last()][@render='doublequote' or @render='singlequote' or 
-                            @render='bolddoublequote' or @render='boldsinglequote']">
+                            test="
+                                $xpath/ead:unittitle/*[last()][@render = 'doublequote' or @render = 'singlequote' or
+                                @render = 'bolddoublequote' or @render = 'boldsinglequote']">
                             <xsl:choose>
                                 <xsl:when test="$xpath/ead:unitdate">
                                     <xsl:apply-templates select="$xpath/ead:unittitle"
@@ -1133,15 +1243,16 @@
                 <!--the rest handles the unitdates...  if a title is missing, the unitdate
                     will thus just stand in for the unittitle-->
                 <xsl:apply-templates
-                    select="$xpath/ead:unitdate[not(contains(., 'undated'))][not(@type='bulk')]"
+                    select="$xpath/ead:unitdate[not(contains(., 'undated'))][not(@type = 'bulk')]"
                     mode="date-title-combine">
                     <xsl:sort select="substring-before(@normal, '/')" data-type="number"/>
                     <xsl:sort select="substring-after(@normal, '/')" data-type="number"/>
                     <xsl:sort select="." data-type="text" order="ascending"/>
                 </xsl:apply-templates>
                 <xsl:if
-                    test="$xpath/ead:unitdate[preceding-sibling::ead:unitdate][(contains(., 'undated'))] or
-                    $xpath/ead:unitdate[following-sibling::ead:unitdate][(contains(., 'undated'))]">
+                    test="
+                        $xpath/ead:unitdate[preceding-sibling::ead:unitdate][(contains(., 'undated'))] or
+                        $xpath/ead:unitdate[following-sibling::ead:unitdate][(contains(., 'undated'))]">
                     <xsl:text>, </xsl:text>
                 </xsl:if>
                 <xsl:apply-templates select="$xpath/ead:unitdate[(contains(., 'undated'))]"
@@ -1160,14 +1271,14 @@
         </xsl:choose>
     </xsl:template>
 
-    <xsl:template match="ead:unitdate[not(@type='bulk')]" mode="date-title-combine">
+    <xsl:template match="ead:unitdate[not(@type = 'bulk')]" mode="date-title-combine">
         <xsl:apply-templates/>
         <xsl:if test="not(position() = last())">
             <xsl:text>, </xsl:text>
         </xsl:if>
     </xsl:template>
 
-    <xsl:template match="ead:unitdate[@type='bulk']" mode="date-title-combine">
+    <xsl:template match="ead:unitdate[@type = 'bulk']" mode="date-title-combine">
         <xsl:text> (</xsl:text>
         <xsl:apply-templates/>
         <xsl:if test="not(position() = last())">
