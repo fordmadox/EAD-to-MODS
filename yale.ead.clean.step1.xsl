@@ -29,42 +29,10 @@
     
     <xsl:template match="*/text()[not(normalize-space())]"/>
     
-    <!-- this is to fix an AT proplem.  where else, aside from eventgrp elements, does it choke on mixed content??? 
+    <!-- this is to fix an AT problem.  where else, aside from eventgrp elements, does it choke on mixed content??? 
         (I don't want to use DOE, and this won't always work,  but at least it helps fix some of the serialization problems introduced by the AT upon export)-->
     <xsl:template match="ead:eventgrp/ead:event/text()[matches(., '&lt;|&gt;')][not(contains(., '&amp;'))]" priority="2">
         <xsl:value-of select="replace(., '(&lt;)(&gt;)', '$1 $2')" disable-output-escaping="yes"/>
-    </xsl:template>
-
-    <!--
-        borrowed from Yale to AT BPG style sheet.  i still need to shorten this!. -->
-    <xsl:template match="ead:extent/text()" priority="2">
-        <xsl:variable name="extentStripString">
-            <xsl:text>.0</xsl:text>
-        </xsl:variable>
-        <xsl:variable name="extentString" select="normalize-space(.)"/>
-        <xsl:variable name="extentStringBeforeSpace" select="substring-before($extentString, ' ')"/>
-        <xsl:variable name="extentStringAfterSpace" select="substring-after($extentString,' ')"/>
-        <xsl:variable name="extentStringBeforeSpaceLength"
-            select="string-length($extentStringBeforeSpace)"/>
-        <xsl:variable name="extentStringBeforeSpaceLengthLessOne"
-            select="number($extentStringBeforeSpaceLength - 1)"/>
-        <xsl:variable name="extentStringBeforeSpaceLastTwoChars"
-            select="substring($extentStringBeforeSpace,$extentStringBeforeSpaceLengthLessOne,$extentStringBeforeSpaceLength)"/>
-        <xsl:variable name="extentStringBeforeSpaceLengthLessTwo"
-            select="number($extentStringBeforeSpaceLength - 2)"/>
-        <xsl:variable name="extentStringBeforeSpaceStringBeforeLastTwoChars"
-            select="substring($extentString, 1, $extentStringBeforeSpaceLengthLessTwo)"/>
-        <xsl:choose>
-            <xsl:when
-                test="normalize-space($extentStringBeforeSpaceLastTwoChars)=normalize-space($extentStripString)">
-                <xsl:value-of select="$extentStringBeforeSpaceStringBeforeLastTwoChars"/>
-                <xsl:text> </xsl:text>
-                <xsl:value-of select="$extentStringAfterSpace"/>
-            </xsl:when>
-            <xsl:otherwise>
-                <xsl:value-of select="$extentString"/>
-            </xsl:otherwise>
-        </xsl:choose>
     </xsl:template>
 
     
