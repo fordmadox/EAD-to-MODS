@@ -398,6 +398,22 @@
     <xsl:template match="ead:did" mode="ead-snippet-copy">
         <xsl:copy>
             <xsl:copy-of select="@* | *"/>
+            <xsl:if test="not(ead:unittitle)">
+                <xsl:copy select="ancestor::*[ead:did/ead:unittitle][1]/ead:did/ead:unittitle">
+                    <xsl:attribute name="altrender">
+                        <xsl:text>inherited</xsl:text>
+                    </xsl:attribute>
+                    <xsl:copy-of select="@* except @altrender | node()"/>
+                </xsl:copy>
+            </xsl:if>
+            <xsl:if test="not(ead:unitdate)">
+                <xsl:copy select="ancestor::*[ead:did/ead:unitdate][1]/ead:did/ead:unitdate">
+                    <xsl:attribute name="altrender">
+                        <xsl:text>inherited</xsl:text>
+                    </xsl:attribute>
+                    <xsl:copy-of select="@* except @altrender | node()"/>
+                </xsl:copy>
+            </xsl:if>
             <!-- added for materials held elsewhere, so we need to inherit the physloc information-->
             <xsl:if test="not(ead:physloc)">
                 <xsl:copy select="ancestor::*[ead:did/ead:physloc][1]/ead:did/ead:physloc">
@@ -431,9 +447,9 @@
         <xsl:call-template name="construct-title-for-HTML"/>
 
         <!-- test to make sure this produces results as expected.-->
-        <xsl:if test="ead:unitdate/normalize-space() = ''">
+        <xsl:if test="ead:unitdate/normalize-space() = '' or not(ead:unitdate)">
             <xsl:apply-templates
-                select="../ancestor::*[ead:did/ead:unitdate/not(normalize-space() = '')][1]/ead:did/ead:unitdate"
+                select="../ancestor::*[ead:did/ead:unitdate/normalize-space() ne ''][1]/ead:did/ead:unitdate"
             />
         </xsl:if>
         <xsl:apply-templates select="ead:unitdate[not(contains(., 'undated'))][not(@type = 'bulk')]">
