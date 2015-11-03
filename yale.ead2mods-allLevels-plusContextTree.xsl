@@ -48,6 +48,10 @@
         -->
 
     <xsl:output encoding="UTF-8" indent="yes" method="xml"/>
+    
+    <!-- change this parameter to a list of options to determine what elements (not) to inherit.  
+        for now, I'm just adding a single option so that we can choose not to inherit dates, as well -->
+    <xsl:param name="inherit-dates-option"  as="xs:boolean" select="false()"/>
 
     <!-- the user must specify what elements are to be stripped when calling the style sheet-->
     <xsl:param name="element-to-strip"/>
@@ -406,7 +410,7 @@
                     <xsl:copy-of select="@* except @altrender | node()"/>
                 </xsl:copy>
             </xsl:if>
-            <xsl:if test="not(ead:unitdate)">
+            <xsl:if test="not(ead:unitdate) and $inherit-dates-option eq true()">
                 <xsl:copy select="ancestor::*[ead:did/ead:unitdate][1]/ead:did/ead:unitdate">
                     <xsl:attribute name="altrender">
                         <xsl:text>inherited</xsl:text>
@@ -447,7 +451,7 @@
         <xsl:call-template name="construct-title-for-HTML"/>
 
         <!-- test to make sure this produces results as expected.-->
-        <xsl:if test="ead:unitdate/normalize-space() = '' or not(ead:unitdate)">
+        <xsl:if test="$inherit-dates-option eq true() and (ead:unitdate/normalize-space() = '' or not(ead:unitdate))">
             <xsl:apply-templates
                 select="../ancestor::*[ead:did/ead:unitdate/normalize-space() ne ''][1]/ead:did/ead:unitdate"
             />
