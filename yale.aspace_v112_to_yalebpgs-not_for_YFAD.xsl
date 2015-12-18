@@ -912,7 +912,7 @@
           <!-- just adding the next line until i write a date conversion function-->
           <xsl:value-of select="mdc:iso-date-2-display-form($first-date)"/>
           <xsl:if test="$first-date ne $second-date">
-            <xsl:text> - </xsl:text>
+             <xsl:text>&#8211;</xsl:text>
             <xsl:value-of select="mdc:iso-date-2-display-form($second-date)"/>
           </xsl:if>
         </xsl:otherwise>
@@ -952,7 +952,7 @@
           <xsl:variable name="second-date" select="replace(substring-after(@normal, '/'), '\D', '')"/>
           <xsl:value-of select="mdc:iso-date-2-display-form($first-date)"/>
           <xsl:if test="$first-date ne $second-date">
-            <xsl:text> - </xsl:text>
+             <xsl:text>&#8211;</xsl:text>
             <xsl:value-of select="mdc:iso-date-2-display-form($second-date)"/>
           </xsl:if>
         </xsl:otherwise>
