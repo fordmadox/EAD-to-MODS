@@ -703,6 +703,12 @@
             <xsl:apply-templates/>
         </mods:physicalDescription>
     </xsl:template>
+    
+    <xsl:template match="ead:physdesc/text()">
+        <mods:note>
+            <xsl:apply-templates/>
+        </mods:note>
+    </xsl:template>
 
     <xsl:template match="ead:extent">
         <mods:extent>
