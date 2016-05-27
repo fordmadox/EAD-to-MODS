@@ -706,7 +706,7 @@
     
     <xsl:template match="ead:physdesc/text()">
         <mods:note>
-            <xsl:apply-templates/>
+            <xsl:value-of select="."/>
         </mods:note>
     </xsl:template>
 
