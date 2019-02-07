@@ -146,12 +146,13 @@
   
   
   <!-- MDC: and a few more changes to ensure valid EAD with the ASpace exports -->
-  <xsl:template match="ead:ref/@type"/>
-  <xsl:template match="@actuate | @show">
+  <xsl:template match="ead:ref/@type | @actuate | @show">
     <xsl:attribute name="xlink:{local-name()}" namespace="http://www.w3.org/1999/xlink">
       <xsl:value-of select="."/>
     </xsl:attribute>
   </xsl:template>
+  <!-- MDC: get rid of any empty attributes -->
+  <xsl:template match="@*[not(normalize-space())]" priority="2"/>
 
   <!-- MDC:  new additions for new data-entry rules in ArchivesSpace !!! -->
   <xsl:template match="ead:*[@level = 'series']/ead:did/ead:unitid[matches(., '^\d+$')]">
