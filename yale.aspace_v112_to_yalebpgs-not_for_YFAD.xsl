@@ -55,7 +55,7 @@
   <xsl:param name="changeDesc">Transforms ArchivesSpace EAD export so that it complies with the Yale
     EAD Best Practice Guidelines.</xsl:param>
 
-  <xsl:include href="http://www.library.yale.edu/facc/xsl/include/yale.ead2002.id_head_values.xsl"/>
+  <xsl:include href="yale.ead2002.id_head_values.xsl"/>
 
   <!-- Repository Parameter -->
   <xsl:param name="repository">
@@ -138,6 +138,18 @@
   <xsl:template match="@id[starts-with(., 'aspace_ref')]">
     <xsl:attribute name="id">
       <xsl:value-of select="substring-after(., 'aspace_')"/>
+    </xsl:attribute>
+  </xsl:template>
+  
+  <!-- MDC: new addition to scrub those AT database IDs that were added to the ASpace exports -->
+  <xsl:template match="ead:unitid[starts-with(@type, 'Archivists Toolkit Database')]"/>
+  
+  
+  <!-- MDC: and a few more changes to ensure valid EAD with the ASpace exports -->
+  <xsl:template match="ead:ref/@type"/>
+  <xsl:template match="@actuate | @show">
+    <xsl:attribute name="xlink:{local-name()}" namespace="http://www.w3.org/1999/xlink">
+      <xsl:value-of select="."/>
     </xsl:attribute>
   </xsl:template>
 
@@ -1337,7 +1349,8 @@
     </xsl:attribute>
   </xsl:template>
   
-  <!-- hack to remove the duplicate elements exported by ArchivesSpace for creator + subject -->
+  <!-- hack to remove the duplicate elements exported by ArchivesSpace for creator + subject.
+  may no longer be needed. -->
   <xsl:template match="ead:controlaccess/*[. = preceding-sibling::*]"/>
     
   
